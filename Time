@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World Clock</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+–bg: #080c18;
+–card-day-bg: linear-gradient(135deg, rgba(255,248,235,0.97) 0%, rgba(240,220,195,0.95) 100%);
+–card-night-bg: linear-gradient(135deg, rgba(10,14,30,0.98) 0%, rgba(18,24,48,0.97) 100%);
+–accent: #7c6cff;
+–accent2: #4fa3e0;
+}
+
+body {
+min-height: 100vh;
+background: var(–bg);
+font-family: ‘Playfair Display’, Georgia, serif;
+overflow-x: hidden;
+padding: 36px 20px 60px;
+}
+
+/* Atmospheric orbs */
+.orb {
+position: fixed;
+border-radius: 50%;
+pointer-events: none;
+z-index: 0;
+}
+.orb1 {
+width: 700px; height: 700px;
+top: -250px; left: -200px;
+background: radial-gradient(circle, rgba(100,60,220,0.07) 0%, transparent 65%);
+}
+.orb2 {
+width: 600px; height: 600px;
+bottom: -200px; right: -150px;
+background: radial-gradient(circle, rgba(40,120,240,0.06) 0%, transparent 65%);
+}
+.orb3 {
+width: 400px; height: 400px;
+top: 40%; left: 50%;
+transform: translate(-50%, -50%);
+background: radial-gradient(circle, rgba(80,160,200,0.03) 0%, transparent 70%);
+}
+
+.container { position: relative; z-index: 1; max-width: 1300px; margin: 0 auto; }
+
+/* Header */
+header { text-align: center; margin-bottom: 40px; }
+
+.eyebrow {
+font-family: ‘JetBrains Mono’, monospace;
+font-size: 10px;
+letter-spacing: 0.4em;
+color: #3d4f70;
+text-transform: uppercase;
+margin-bottom: 10px;
+}
+
+h1 {
+font-size: clamp(32px, 6vw, 60px);
+font-weight: 900;
+letter-spacing: -0.03em;
+background: linear-gradient(130deg, #c8bcff 0%, #7c6cff 40%, #4fa3e0 80%);
+-webkit-background-clip: text;
+-webkit-text-fill-color: transparent;
+background-clip: text;
+line-height: 1;
+margin-bottom: 12px;
+}
+
+.utc-display {
+font-family: ‘JetBrains Mono’, monospace;
+font-size: 12px;
+color: #3a4a65;
+letter-spacing: 0.12em;
+margin-bottom: 20px;
+}
+
+.search-wrap {
+display: flex;
+justify-content: center;
+margin-top: 16px;
+}
+
+.search-wrap input {
+background: rgba(255,255,255,0.04);
+border: 1px solid rgba(120,100,220,0.25);
+border-radius: 40px;
+padding: 9px 22px;
+color: #c8bcff;
+font-family: ‘Playfair Display’, serif;
+font-size: 14px;
+outline: none;
+width: 260px;
+letter-spacing: 0.05em;
+transition: border-color 0.3s, background 0.3s;
+}
+.search-wrap input:focus {
+border-color: rgba(120,100,220,0.6);
+background: rgba(255,255,255,0.07);
+}
+.search-wrap input::placeholder { color: #2d3a55; }
+
+/* Grid */
+.grid {
+display: grid;
+grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+gap: 14px;
+}
+
+/* Card */
+.card {
+border-radius: 18px;
+padding: 16px 18px;
+display: flex;
+align-items: center;
+gap: 16px;
+position: relative;
+overflow: hidden;
+cursor: default;
+transition: transform 0.25s ease, box-shadow 0.25s ease;
+opacity: 0;
+animation: fadeUp 0.5s ease forwards;
+}
+
+.card:hover {
+transform: translateY(-3px);
+}
+
+.card.day {
+background: var(–card-day-bg);
+border: 1px solid rgba(180,150,110,0.35);
+box-shadow: 0 4px 22px rgba(140,100,60,0.12), inset 0 1px 0 rgba(255,255,255,0.7);
+}
+.card.day:hover {
+box-shadow: 0 10px 36px rgba(140,100,60,0.22), inset 0 1px 0 rgba(255,255,255,0.7);
+}
+.card.night {
+background: var(–card-night-bg);
+border: 1px solid rgba(70,90,160,0.35);
+box-shadow: 0 4px 22px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.card.night:hover {
+box-shadow: 0 10px 36px rgba(60,80,180,0.25), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+/* Day/night badge */
+.dn-badge {
+position: absolute;
+top: 10px;
+right: 12px;
+font-size: 13px;
+opacity: 0.8;
+}
+
+/* Clock */
+.clock-wrap canvas {
+display: block;
+border-radius: 50%;
+}
+
+/* Info */
+.info { flex: 1; min-width: 0; }
+
+.city-name-row {
+display: flex;
+align-items: center;
+gap: 7px;
+margin-bottom: 5px;
+}
+
+.flag { font-size: 17px; line-height: 1; }
+
+.city-name {
+font-family: ‘Playfair Display’, serif;
+font-weight: 700;
+font-size: 15px;
+letter-spacing: 0.02em;
+white-space: nowrap;
+overflow: hidden;
+text-overflow: ellipsis;
+}
+.day .city-name { color: #2a1500; }
+.night .city-name { color: #e4d9ff; }
+
+.time-digits {
+font-family: ‘JetBrains Mono’, monospace;
+font-weight: 700;
+font-size: 24px;
+letter-spacing: 0.04em;
+line-height: 1;
+margin-bottom: 5px;
+}
+.day .time-digits { color: #150800; }
+.night .time-digits { color: #ffffff; }
+
+.date-str {
+font-family: ‘Playfair Display’, serif;
+font-size: 11px;
+font-style: italic;
+letter-spacing: 0.06em;
+}
+.day .date-str { color: #8a6040; }
+.night .date-str { color: #6a7aa0; }
+
+.footer {
+text-align: center;
+margin-top: 44px;
+font-family: ‘JetBrains Mono’, monospace;
+font-size: 10px;
+letter-spacing: 0.22em;
+color: #1e2a40;
+}
+
+.empty {
+grid-column: 1 / -1;
+text-align: center;
+padding: 60px;
+color: #2d3a55;
+font-size: 16px;
+}
+
+@keyframes fadeUp {
+from { opacity: 0; transform: translateY(18px); }
+to   { opacity: 1; transform: translateY(0); }
+}
+</style>
+
+</head>
+<body>
+
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+<div class="orb orb3"></div>
+
+<div class="container">
+  <header>
+    <div class="eyebrow">Global Time Network</div>
+    <h1>World Clock</h1>
+    <div class="utc-display" id="utc-display">—</div>
+    <div class="search-wrap">
+      <input type="text" id="search" placeholder="Search city…" autocomplete="off">
+    </div>
+  </header>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="footer" id="footer"></div>
+</div>
+
+<script>
+const CITIES = [
+  { name: "Dallas",       tz: "America/Chicago",                  cc: "US" },
+  { name: "London",       tz: "Europe/London",                    cc: "GB" },
+  { name: "Lucknow",      tz: "Asia/Kolkata",                     cc: "IN" },
+  { name: "Seoul",        tz: "Asia/Seoul",                       cc: "KR" },
+  { name: "New York",     tz: "America/New_York",                 cc: "US" },
+  { name: "Ankara",       tz: "Europe/Istanbul",                  cc: "TR" },
+  { name: "Atlanta",      tz: "America/New_York",                 cc: "US" },
+  { name: "Tokyo",        tz: "Asia/Tokyo",                       cc: "JP" },
+  { name: "Singapore",    tz: "Asia/Singapore",                   cc: "SG" },
+  { name: "Chicago",      tz: "America/Chicago",                  cc: "US" },
+  { name: "Wellington",   tz: "Pacific/Auckland",                 cc: "NZ" },
+  { name: "Paris",        tz: "Europe/Paris",                     cc: "FR" },
+  { name: "Seattle",      tz: "America/Los_Angeles",              cc: "US" },
+  { name: "São Paulo",    tz: "America/Sao_Paulo",                cc: "BR" },
+  { name: "Toronto",      tz: "America/Toronto",                  cc: "CA" },
+  { name: "Tel Aviv",     tz: "Asia/Jerusalem",                   cc: "IL" },
+  { name: "Miami",        tz: "America/New_York",                 cc: "US" },
+  { name: "Buenos Aires", tz: "America/Argentina/Buenos_Aires",   cc: "AR" },
+  { name: "Munich",       tz: "Europe/Berlin",                    cc: "DE" },
+  { name: "Milan",        tz: "Europe/Rome",                      cc: "IT" },
+  { name: "Warsaw",       tz: "Europe/Warsaw",                    cc: "PL" },
+  { name: "Madrid",       tz: "Europe/Madrid",                    cc: "ES" },
+];
+
+const FLAGS = {
+  US:"🇺🇸",GB:"🇬🇧",IN:"🇮🇳",KR:"🇰🇷",TR:"🇹🇷",
+  JP:"🇯🇵",SG:"🇸🇬",NZ:"🇳🇿",FR:"🇫🇷",BR:"🇧🇷",
+  CA:"🇨🇦",IL:"🇮🇱",AR:"🇦🇷",DE:"🇩🇪",IT:"🇮🇹",
+  PL:"🇵🇱",ES:"🇪🇸",
+};
+
+function getTzTime(tz) {
+  const now = new Date();
+  const s = now.toLocaleString("en-US", { timeZone: tz, hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false });
+  const [h, m, sec] = s.split(":").map(Number);
+  return { h, m, s: sec };
+}
+
+function getTzDate(tz) {
+  return new Date().toLocaleString("en-US", { timeZone: tz, weekday:"short", month:"short", day:"numeric" });
+}
+
+function isDay(h) { return h >= 6 && h < 20; }
+
+function pad(n) { return String(n).padStart(2,"0"); }
+
+// ---- Canvas analog clock ----
+const SIZE = 86;
+const DPR  = window.devicePixelRatio || 1;
+
+function createCanvas() {
+  const c = document.createElement("canvas");
+  c.width  = SIZE * DPR;
+  c.height = SIZE * DPR;
+  c.style.width  = SIZE + "px";
+  c.style.height = SIZE + "px";
+  return c;
+}
+
+function drawClock(canvas, h, m, s, day) {
+  const ctx = canvas.getContext("2d");
+  const sz  = SIZE * DPR;
+  const cx  = sz / 2, cy = sz / 2;
+  const r   = sz / 2 - 5 * DPR;
+
+  ctx.clearRect(0, 0, sz, sz);
+
+  // Face
+  const grad = ctx.createRadialGradient(cx*0.7, cy*0.6, 2, cx, cy, r);
+  if (day) {
+    grad.addColorStop(0, "#fff8f0");
+    grad.addColorStop(1, "#e8d8c4");
+  } else {
+    grad.addColorStop(0, "#1c2240");
+    grad.addColorStop(1, "#0c1025");
+  }
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI*2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Rim
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI*2);
+  ctx.strokeStyle = day ? "rgba(180,140,100,0.5)" : "rgba(70,90,160,0.5)";
+  ctx.lineWidth = 1.5 * DPR;
+  ctx.stroke();
+
+  // Hour ticks
+  for (let i = 0; i < 12; i++) {
+    const ang = (i / 12) * Math.PI * 2 - Math.PI / 2;
+    const x1 = cx + (r - 8*DPR) * Math.cos(ang);
+    const y1 = cy + (r - 8*DPR) * Math.sin(ang);
+    const x2 = cx + r * Math.cos(ang);
+    const y2 = cy + r * Math.sin(ang);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.strokeStyle = day ? "rgba(140,100,70,0.55)" : "rgba(100,120,180,0.5)";
+    ctx.lineWidth = (i % 3 === 0 ? 2.2 : 1.2) * DPR;
+    ctx.stroke();
+  }
+
+  // Minute ticks
+  for (let i = 0; i < 60; i++) {
+    if (i % 5 === 0) continue;
+    const ang = (i / 60) * Math.PI * 2 - Math.PI / 2;
+    const x1 = cx + (r - 4*DPR) * Math.cos(ang);
+    const y1 = cy + (r - 4*DPR) * Math.sin(ang);
+    const x2 = cx + r * Math.cos(ang);
+    const y2 = cy + r * Math.sin(ang);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.strokeStyle = day ? "rgba(180,150,120,0.3)" : "rgba(60,80,140,0.3)";
+    ctx.lineWidth = 0.8 * DPR;
+    ctx.stroke();
+  }
+
+  function hand(deg, len, width, color, hasCap) {
+    const ang = (deg - 90) * Math.PI / 180;
+    const x2 = cx + len * Math.cos(ang);
+    const y2 = cy + len * Math.sin(ang);
+    const xT = cx - len * 0.15 * Math.cos(ang);
+    const yT = cy - len * 0.15 * Math.sin(ang);
+    ctx.beginPath();
+    ctx.moveTo(xT, yT);
+    ctx.lineTo(x2, y2);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width * DPR;
+    ctx.lineCap = "round";
+    ctx.stroke();
+  }
+
+  const secDeg = s * 6;
+  const minDeg = m * 6 + s * 0.1;
+  const hrDeg  = (h % 12) * 30 + m * 0.5;
+
+  // Hour hand
+  hand(hrDeg,  r * 0.50, 3.2, day ? "#2a1500" : "#d4c9ff", true);
+  // Minute hand
+  hand(minDeg, r * 0.70, 2.2, day ? "#3d2010" : "#a78bfa", true);
+  // Second hand
+  hand(secDeg, r * 0.82, 1.2, day ? "#c0392b" : "#f87171", false);
+
+  // Center dot
+  ctx.beginPath();
+  ctx.arc(cx, cy, 3.5 * DPR, 0, Math.PI * 2);
+  ctx.fillStyle = day ? "#c0392b" : "#f87171";
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx, cy, 1.5 * DPR, 0, Math.PI * 2);
+  ctx.fillStyle = day ? "#fff" : "#200";
+  ctx.fill();
+}
+
+// ---- Build cards ----
+const grid   = document.getElementById("grid");
+const cards  = {};
+const canvases = {};
+
+function buildCards(list) {
+  grid.innerHTML = "";
+  if (list.length === 0) {
+    grid.innerHTML = '<div class="empty">No cities found…</div>';
+    return;
+  }
+  list.forEach((city, idx) => {
+    const { h, m, s } = getTzTime(city.tz);
+    const day = isDay(h);
+
+    const card = document.createElement("div");
+    card.className = "card " + (day ? "day" : "night");
+    card.style.animationDelay = (idx * 35) + "ms";
+
+    const canvas = createCanvas();
+    drawClock(canvas, h, m, s, day);
+
+    const badge  = day ? "☀️" : "🌙";
+    const flag   = FLAGS[city.cc] || "";
+    const timeStr= `${pad(h)}:${pad(m)}:${pad(s)}`;
+    const dateStr= getTzDate(city.tz);
+
+    card.innerHTML = `
+      <div class="clock-wrap"></div>
+      <div class="info">
+        <div class="city-name-row">
+          <span class="flag">${flag}</span>
+          <span class="city-name">${city.name}</span>
+        </div>
+        <div class="time-digits">${timeStr}</div>
+        <div class="date-str">${dateStr}</div>
+      </div>
+      <div class="dn-badge">${badge}</div>
+    `;
+    card.querySelector(".clock-wrap").appendChild(canvas);
+
+    grid.appendChild(card);
+    cards[city.name]   = card;
+    canvases[city.name] = canvas;
+  });
+}
+
+// ---- Tick ----
+function tick() {
+  // UTC header
+  document.getElementById("utc-display").textContent =
+    new Date().toUTCString().replace("GMT","UTC");
+
+  const query = document.getElementById("search").value.toLowerCase();
+  const visible = CITIES.filter(c => c.name.toLowerCase().includes(query));
+
+  visible.forEach(city => {
+    const card   = cards[city.name];
+    const canvas = canvases[city.name];
+    if (!card || !canvas) return;
+
+    const { h, m, s } = getTzTime(city.tz);
+    const day = isDay(h);
+
+    // Update class
+    card.className = "card " + (day ? "day" : "night");
+    card.style.opacity = "1";
+    card.style.animation = "none";
+
+    // Update clock
+    drawClock(canvas, h, m, s, day);
+
+    // Update digits
+    card.querySelector(".time-digits").textContent = `${pad(h)}:${pad(m)}:${pad(s)}`;
+
+    // Badge
+    card.querySelector(".dn-badge").textContent = day ? "☀️" : "🌙";
+  });
+
+  // Footer
+  document.getElementById("footer").textContent =
+    `☀️ DAY  ·  🌙 NIGHT  ·  ${visible.length} CITIES`;
+}
+
+// ---- Search ----
+document.getElementById("search").addEventListener("input", () => {
+  const query = document.getElementById("search").value.toLowerCase();
+  buildCards(CITIES.filter(c => c.name.toLowerCase().includes(query)));
+  tick();
+});
+
+// ---- Init ----
+buildCards(CITIES);
+tick();
+setInterval(tick, 1000);
+</script>
+
+</body>
+</html>
